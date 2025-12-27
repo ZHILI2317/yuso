@@ -102,6 +102,10 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
             return queryWrapper;
         }
         String searchText = postQueryRequest.getSearchText();
+        // 兼容前端传递的userName参数
+        if (StringUtils.isBlank(searchText)) {
+            searchText = postQueryRequest.getUserName();
+        }
         String sortField = postQueryRequest.getSortField();
         String sortOrder = postQueryRequest.getSortOrder();
         Long id = postQueryRequest.getId();
@@ -110,22 +114,37 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
         List<String> tagList = postQueryRequest.getTags();
         Long userId = postQueryRequest.getUserId();
         Long notId = postQueryRequest.getNotId();
-        // 拼接查询条件
+        
+        // 基础过滤条件
+        queryWrapper.eq("isDelete", 0);
+        
+        // 搜索关键词处理 - 只搜索标题
         if (StringUtils.isNotBlank(searchText)) {
-            queryWrapper.and(qw -> qw.like("title", searchText).or().like("content", searchText));
+            queryWrapper.like("title", searchText);
         }
+        
+        // 精确匹配条件
         queryWrapper.like(StringUtils.isNotBlank(title), "title", title);
         queryWrapper.like(StringUtils.isNotBlank(content), "content", content);
+        queryWrapper.eq(ObjectUtils.isNotEmpty(id), "id", id);
+        queryWrapper.eq(ObjectUtils.isNotEmpty(userId), "userId", userId);
+        queryWrapper.ne(ObjectUtils.isNotEmpty(notId), "id", notId);
+        
+        // 标签搜索
         if (CollUtil.isNotEmpty(tagList)) {
             for (String tag : tagList) {
                 queryWrapper.like("tags", "\"" + tag + "\"");
             }
         }
-        queryWrapper.ne(ObjectUtils.isNotEmpty(notId), "id", notId);
-        queryWrapper.eq(ObjectUtils.isNotEmpty(id), "id", id);
-        queryWrapper.eq(ObjectUtils.isNotEmpty(userId), "userId", userId);
-        queryWrapper.orderBy(SqlUtils.validSortField(sortField), sortOrder.equals(CommonConstant.SORT_ORDER_ASC),
-                sortField);
+        
+        // 排序处理
+        if (StringUtils.isNotBlank(sortField) && SqlUtils.validSortField(sortField)) {
+            queryWrapper.orderBy(true, CommonConstant.SORT_ORDER_ASC.equals(sortOrder), sortField);
+        } else {
+            // 默认按创建时间倒序
+            queryWrapper.orderByDesc("createTime");
+        }
+        
         return queryWrapper;
     }
 
@@ -174,7 +193,6 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
         // 按关键词检索
         if (StringUtils.isNotBlank(searchText)) {
             boolQueryBuilder.should(QueryBuilders.matchQuery("title", searchText));
-            boolQueryBuilder.should(QueryBuilders.matchQuery("description", searchText));
             boolQueryBuilder.should(QueryBuilders.matchQuery("content", searchText));
             boolQueryBuilder.minimumShouldMatch(1);
         }

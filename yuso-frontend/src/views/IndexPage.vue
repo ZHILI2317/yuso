@@ -1,20 +1,20 @@
 <template>
   <div class="index-page">
     <a-input-search
-      v-model:value="searchParams.text"
-      placeholder="input search text"
-      enter-button="Search"
-      size="large"
-      @search="onSearch"
+        v-model:value="searchParams.text"
+        placeholder="input search text"
+        enter-button="Search"
+        size="large"
+        @search="onSearch"
     />
   </div>
   <my-divider />
   <a-tabs v-model:activeKey="activeKey" @change="onTabChange">
     <a-tab-pane key="post" tab="文章">
-      <PostList :post-List="postList" />
+      <PostList :post-list="postList" />
     </a-tab-pane>
     <a-tab-pane key="picture" tab="图片">
-      <PictureList />
+      <PictureList :picture-list="pictureList" />
     </a-tab-pane>
     <a-tab-pane key="user" tab="用户">
       <UserList :user-list="userList" />
@@ -35,23 +35,46 @@ const router = useRouter();
 const route = useRoute();
 const activeKey = route.params.category;
 const postList = ref([]);
-
-myAxios.post("post/list/page/vo", {}).then((res: any) => {
-  postList.value = res.records;
-});
-
 const userList = ref([]);
+const pictureList = ref([]);
 
-myAxios.post("user/list/page/vo", {}).then((res: any) => {
-  userList.value = res.records;
-});
-const initSearchParams = ref({
+const initSearchParams = {
   text: "",
   pageSize: 10,
   pageNum: 1,
-});
+};
+
+/**
+ * 加载数据
+ * @param params
+ */
+const loadData = (params: any) => {
+  const postQuery = {
+    ...params,
+    searchText: params.text,
+  };
+  myAxios.post("user/list/page/vo", postQuery).then((res: any) => {
+    userList.value = res.records;
+  });
+  const userQuery = {
+    ...params,
+    userName: params.text,
+  };
+  myAxios.post("post/list/page/vo", userQuery).then((res: any) => {
+    postList.value = res.records;
+  });
+  const pictureQuery = {
+    ...params,
+    searchText: params.text,
+  };
+  myAxios.post("picture/list/page/vo", pictureQuery).then((res: any) => {
+    pictureList.value = res.records;
+  });
+};
 
 const searchParams = ref(initSearchParams);
+// 首次请求
+loadData(initSearchParams);
 
 watchEffect(() => {
   searchParams.value = {
@@ -61,11 +84,13 @@ watchEffect(() => {
 });
 
 const onSearch = (value: string) => {
-  alert(value);
+  console.log(value);
   router.push({
     query: searchParams.value,
   });
+  loadData(searchParams.value);
 };
+
 const onTabChange = (key: string) => {
   router.push({
     path: `/${key}`,
@@ -73,3 +98,4 @@ const onTabChange = (key: string) => {
   });
 };
 </script>
+

@@ -1,6 +1,7 @@
 package com.yupi.springbootinit.controller;
 
 import cn.hutool.json.JSONUtil;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.yupi.springbootinit.annotation.AuthCheck;
 import com.yupi.springbootinit.common.BaseResponse;
@@ -23,6 +24,7 @@ import java.util.List;
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -166,7 +168,7 @@ public class PostController {
     }
 
     /**
-     * 分页获取列表（封装类）
+     * 分页获取列表（封装类）- 支持标题和内容搜索
      *
      * @param postQueryRequest
      * @param request
@@ -179,8 +181,11 @@ public class PostController {
         long size = postQueryRequest.getPageSize();
         // 限制爬虫
         ThrowUtils.throwIf(size > 20, ErrorCode.PARAMS_ERROR);
-        Page<Post> postPage = postService.page(new Page<>(current, size),
-                postService.getQueryWrapper(postQueryRequest));
+
+        // 使用service中的查询构建器，支持更全面的搜索
+        QueryWrapper<Post> queryWrapper = postService.getQueryWrapper(postQueryRequest);
+        
+        Page<Post> postPage = postService.page(new Page<>(current, size), queryWrapper);
         return ResultUtils.success(postService.getPostVOPage(postPage, request));
     }
 
@@ -208,10 +213,8 @@ public class PostController {
         return ResultUtils.success(postService.getPostVOPage(postPage, request));
     }
 
-    // endregion
-
     /**
-     * 分页搜索（从 ES 查询，封装类）
+     * 分页搜索（从数据库查询标题，封装类）
      *
      * @param postQueryRequest
      * @param request
@@ -220,13 +223,45 @@ public class PostController {
     @PostMapping("/search/page/vo")
     public BaseResponse<Page<PostVO>> searchPostVOByPage(@RequestBody PostQueryRequest postQueryRequest,
             HttpServletRequest request) {
+        if (postQueryRequest == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        long current = postQueryRequest.getCurrent();
         long size = postQueryRequest.getPageSize();
         // 限制爬虫
         ThrowUtils.throwIf(size > 20, ErrorCode.PARAMS_ERROR);
-        Page<Post> postPage = postService.searchFromEs(postQueryRequest);
+
+        // 获取搜索关键词
+        String searchText = postQueryRequest.getSearchText();
+        // 兼容前端传递的userName参数
+        if (StringUtils.isBlank(searchText)) {
+            searchText = postQueryRequest.getUserName();
+        }
+        
+        // 如果没有搜索关键词，返回空结果
+        if (StringUtils.isBlank(searchText)) {
+            Page<PostVO> emptyPage = new Page<>(current, size);
+            emptyPage.setTotal(0);
+            return ResultUtils.success(emptyPage);
+        }
+
+        // 构建查询条件，专注于标题搜索
+        QueryWrapper<Post> queryWrapper = new QueryWrapper<>();
+        queryWrapper.like("title", searchText)
+                   .eq("isDelete", 0)
+                   .orderByDesc("createTime"); // 按创建时间倒序排列
+
+        // 如果有其他筛选条件，也加上
+        if (postQueryRequest.getUserId() != null) {
+            queryWrapper.eq("userId", postQueryRequest.getUserId());
+        }
+        if (postQueryRequest.getId() != null) {
+            queryWrapper.eq("id", postQueryRequest.getId());
+        }
+
+        Page<Post> postPage = postService.page(new Page<>(current, size), queryWrapper);
         return ResultUtils.success(postService.getPostVOPage(postPage, request));
     }
-
     /**
      * 编辑（用户）
      *
@@ -261,3 +296,8 @@ public class PostController {
     }
 
 }
+
+
+
+
+

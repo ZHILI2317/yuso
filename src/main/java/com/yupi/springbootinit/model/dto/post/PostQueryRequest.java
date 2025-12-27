@@ -27,9 +27,14 @@ public class PostQueryRequest extends PageRequest implements Serializable {
     private Long notId;
 
     /**
-     * 搜索词
+     * 搜索词（兼容前端传递的userName参数）
      */
     private String searchText;
+
+    /**
+     * 用户名（兼容旧版前端参数）
+     */
+    private String userName;
 
     /**
      * 标题
