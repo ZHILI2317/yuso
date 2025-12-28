@@ -11,15 +11,19 @@ import com.yupi.springbootinit.config.WxOpenConfig;
 import com.yupi.springbootinit.constant.UserConstant;
 import com.yupi.springbootinit.exception.BusinessException;
 import com.yupi.springbootinit.exception.ThrowUtils;
+import com.yupi.springbootinit.model.dto.post.PostQueryRequest;
 import com.yupi.springbootinit.model.dto.user.UserAddRequest;
 import com.yupi.springbootinit.model.dto.user.UserLoginRequest;
 import com.yupi.springbootinit.model.dto.user.UserQueryRequest;
 import com.yupi.springbootinit.model.dto.user.UserRegisterRequest;
 import com.yupi.springbootinit.model.dto.user.UserUpdateMyRequest;
 import com.yupi.springbootinit.model.dto.user.UserUpdateRequest;
+import com.yupi.springbootinit.model.entity.Post;
 import com.yupi.springbootinit.model.entity.User;
 import com.yupi.springbootinit.model.vo.LoginUserVO;
+import com.yupi.springbootinit.model.vo.PostVO;
 import com.yupi.springbootinit.model.vo.UserVO;
+import com.yupi.springbootinit.service.PostService;
 import com.yupi.springbootinit.service.UserService;
 
 import java.util.List;
@@ -33,6 +37,7 @@ import me.chanjar.weixin.common.bean.oauth2.WxOAuth2AccessToken;
 import me.chanjar.weixin.mp.api.WxMpService;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.DigestUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -59,6 +64,9 @@ public class UserController {
 
     @Resource
     private WxOpenConfig wxOpenConfig;
+
+    @Autowired
+    private PostService postService;
 
     // region 登录相关
 
@@ -270,36 +278,21 @@ public class UserController {
     }
 
     /**
-     * 分页获取用户封装列表
+     * 分页获取列表（封装类）
      *
-     * @param userQueryRequest
+     * @param postQueryRequest
      * @param request
      * @return
      */
     @PostMapping("/list/page/vo")
-    public BaseResponse<Page<UserVO>> listUserVOByPage(@RequestBody UserQueryRequest userQueryRequest,
+    public BaseResponse<Page<PostVO>> listPostVOByPage(@RequestBody PostQueryRequest postQueryRequest,
                                                        HttpServletRequest request) {
-        if (userQueryRequest == null) {
-            throw new BusinessException(ErrorCode.PARAMS_ERROR);
-        }
-        long current = userQueryRequest.getCurrent();
-        long size = userQueryRequest.getPageSize();
+        long current = postQueryRequest.getCurrent();
+        long size = postQueryRequest.getPageSize();
         // 限制爬虫
         ThrowUtils.throwIf(size > 20, ErrorCode.PARAMS_ERROR);
-
-        // 添加搜索关键词处理
-        String searchText = userQueryRequest.getSearchText();
-        QueryWrapper<User> queryWrapper = userService.getQueryWrapper(userQueryRequest);
-        if (StringUtils.isNotBlank(searchText)) {
-            // 模糊搜索用户昵称和简介
-            queryWrapper.like("userName", searchText).or().like("userProfile", searchText);
-        }
-
-        Page<User> userPage = userService.page(new Page<>(current, size), queryWrapper);
-        Page<UserVO> userVOPage = new Page<>(current, size, userPage.getTotal());
-        List<UserVO> userVO = userService.getUserVO(userPage.getRecords());
-        userVOPage.setRecords(userVO);
-        return ResultUtils.success(userVOPage);
+        Page<PostVO> PostVOPage = postService.listPostVOByPage(postQueryRequest, request);
+        return ResultUtils.success(PostVOPage);
     }
     // endregion
 

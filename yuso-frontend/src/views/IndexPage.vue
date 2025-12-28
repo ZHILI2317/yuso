@@ -48,7 +48,7 @@ const initSearchParams = {
  * 加载数据
  * @param params
  */
-const loadData = (params: any) => {
+const loadDataOld = (params: any) => {
   const postQuery = {
     ...params,
     searchText: params.text,
@@ -72,6 +72,18 @@ const loadData = (params: any) => {
   });
 };
 
+
+const loadData = (params: any) => {
+  const query = {
+    ...params,
+    searchText: params.text,
+  };
+  myAxios.post("search/all", query).then((res: any) => {
+    userList.value = res.userList;
+    postList.value = res.postList;
+    pictureList.value = res.pictureList;
+  });
+};
 const searchParams = ref(initSearchParams);
 // 首次请求
 loadData(initSearchParams);
