@@ -2,7 +2,9 @@ package com.yupi.springbootinit.controller;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.yupi.springbootinit.common.BaseResponse;
+import com.yupi.springbootinit.common.ErrorCode;
 import com.yupi.springbootinit.common.ResultUtils;
+import com.yupi.springbootinit.exception.BusinessException;
 import com.yupi.springbootinit.model.dto.post.PostQueryRequest;
 import com.yupi.springbootinit.model.dto.search.SearchRequest;
 import com.yupi.springbootinit.model.dto.user.UserQueryRequest;
@@ -22,6 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * 帖子接口
@@ -45,30 +48,52 @@ public class SearchController {
     @Resource
     private PictureService pictureService;
 
-    @RequestMapping("/all")
+    @PostMapping("/all")
     public BaseResponse<SearchVO> searchAll(@RequestBody SearchRequest searchRequest, HttpServletRequest request) {
         String searchText = searchRequest.getSearchText();
 
-        // 1. 搜索图片
-        Page<Picture> picturePage = pictureService.searchPicture(searchText, 1, 10);
+        // 1. 异步查询用户信息
+        CompletableFuture<Page<UserVO>> userTask = CompletableFuture.supplyAsync(() -> {
+            UserQueryRequest userQueryRequest = new UserQueryRequest();
+            userQueryRequest.setUserName(searchText);
+            Page<UserVO> userVOPage = userService.listUserVOByPage(userQueryRequest);
+            return userVOPage;
+        });
 
-        // 2. 搜索用户
-        UserQueryRequest userQueryRequest = new UserQueryRequest();
-        userQueryRequest.setUserName(searchText);
-        Page<UserVO> userVOPage = userService.listUserVOByPage(userQueryRequest);
+        // 2. 异步查询帖子信息
+        CompletableFuture<Page<PostVO>> postTask = CompletableFuture.supplyAsync(() -> {
+            PostQueryRequest postQueryRequest = new PostQueryRequest();
+            postQueryRequest.setSearchText(searchText);
+            Page<PostVO> postVOPage = postService.listPostVOByPage(postQueryRequest, request);
+            return postVOPage;
+        });
 
-        // 3. 搜索帖子
-        PostQueryRequest postQueryRequest = new PostQueryRequest();
-        postQueryRequest.setSearchText(searchText);
-        Page<PostVO> postVOPage = postService.listPostVOByPage(postQueryRequest, request);
+        // 3. 异步查询图片信息
+        CompletableFuture<Page<Picture>> pictureTask = CompletableFuture.supplyAsync(() -> {
+            Page<Picture> picturePage = pictureService.searchPicture(searchText, 1, 10);
+            return picturePage;
+        });
 
-        // 4. 组装结果
-        SearchVO searchVO = new SearchVO();
-        searchVO.setUserList(userVOPage.getRecords());
-        searchVO.setPostList(postVOPage.getRecords());
-        searchVO.setPictureList(picturePage.getRecords());
+        // 4. 等待所有任务完成
+        CompletableFuture.allOf(userTask, postTask, pictureTask).join();
 
-        return ResultUtils.success(searchVO);
+        try {
+            // 5. 获取各个任务的结果
+            Page<UserVO> userVOPage = userTask.get();
+            Page<PostVO> postVOPage = postTask.get();
+            Page<Picture> picturePage = pictureTask.get();
+
+            // 6. 组装返回结果
+            SearchVO searchVO = new SearchVO();
+            searchVO.setUserList(userVOPage.getRecords());
+            searchVO.setPostList(postVOPage.getRecords());
+            searchVO.setPictureList(picturePage.getRecords());
+
+            return ResultUtils.success(searchVO);
+        } catch (Exception e) {
+            log.error("查询异常", e);
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "查询异常");
+        }
     }
 
 
