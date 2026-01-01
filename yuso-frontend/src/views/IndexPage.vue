@@ -1,11 +1,11 @@
 <template>
   <div class="index-page">
     <a-input-search
-        v-model:value="searchParams.text"
-        placeholder="input search text"
-        enter-button="Search"
-        size="large"
-        @search="onSearch"
+      v-model:value="searchParams.text"
+      placeholder="input search text"
+      enter-button="Search"
+      size="large"
+      @search="onSearch"
     />
   </div>
   <my-divider />
@@ -72,7 +72,6 @@ const loadDataOld = (params: any) => {
   });
 };
 
-
 const loadData = (params: any) => {
   const query = {
     ...params,
@@ -110,4 +109,3 @@ const onTabChange = (key: string) => {
   });
 };
 </script>
-
