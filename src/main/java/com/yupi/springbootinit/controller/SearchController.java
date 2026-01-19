@@ -56,9 +56,11 @@ public class SearchController {
         // 获取Type状态，区分搜索类型
         String type = searchRequest.getType();
         // 获取枚举值
-        SearchTypeEnum searchTypeEnum = SearchTypeEnum.getEnumByValue(searchRequest.getType());
-        ThrowUtils.throwIf(StringUtils.isBlank(type), ErrorCode.PARAMS_ERROR);
-        ThrowUtils.throwIf(searchTypeEnum == null, ErrorCode.PARAMS_ERROR);
+        SearchTypeEnum searchTypeEnum = null;
+        if (StringUtils.isNotBlank(type)) {
+            searchTypeEnum = SearchTypeEnum.getEnumByValue(type);
+            ThrowUtils.throwIf(searchTypeEnum == null, ErrorCode.PARAMS_ERROR);
+        }
         String searchText = searchRequest.getSearchText();
         // 搜索出所有的数据
         if (searchTypeEnum == null) {
